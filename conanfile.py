@@ -41,11 +41,32 @@ class Pagmo2Conan(ConanFile):
         if self.settings.os == "Windows":
             del self.options.fPIC
 
+    @property
+    def _compilers_minimum_version(self):
+        return {
+            "Visual Studio": "15.7",
+            "gcc": "7",
+            "clang": "5.0",
+            "apple-clang": "9.1"
+        }
+
     def configure(self):
         if self.options.shared:
             del self.options.fPIC
         if self.settings.compiler.get_safe("cppstd"):
             tools.check_min_cppstd(self, 17)
+
+        def lazy_lt_semver(v1, v2):
+            lv1 = [int(v) for v in v1.split(".")]
+            lv2 = [int(v) for v in v2.split(".")]
+            min_length = min(len(lv1), len(lv2))
+            return lv1[:min_length] < lv2[:min_length]
+
+        minimum_version = self._compilers_minimum_version.get(str(self.settings.compiler), False)
+        if not minimum_version:
+            self.output.warn("{} {} requires C++17. Your compiler is unknown. Assuming it supports C++17.".format(self.name, self.version))
+        elif lazy_lt_semver(str(self.settings.compiler.version), minimum_version):
+            raise ConanInvalidConfiguration("{} {} requires C++17, which your compiler does not support.".format(self.name, self.version))
 
     def requirements(self):
         self.requires("boost/1.76.0")
